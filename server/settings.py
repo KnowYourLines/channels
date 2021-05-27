@@ -124,5 +124,14 @@ LOCAL = os.environ.get("LOCAL")
 
 ASGI_APPLICATION = "server.asgi.application"
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
+
 if not LOCAL:
     django_heroku.settings(locals())
