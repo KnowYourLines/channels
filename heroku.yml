@@ -2,6 +2,8 @@ setup:
   addons:
     - plan: heroku-postgresql
       as: DATABASE
+    - plan: heroku-redis
+      as: REDIS
   config:
     SECRET_KEY: change-me-to-50-secret-characters
     DEBUG: True
@@ -13,4 +15,8 @@ release:
   command:
     - python manage.py makemigrations api; python manage.py migrate
 run:
-  web: gunicorn server.wsgi
+  web: daphne server.asgi:application --port $PORT --bind 0.0.0.0
+  worker:
+    command:
+      - python manage.py runworker channel_layer
+    image: web
