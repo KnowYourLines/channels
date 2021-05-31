@@ -36,15 +36,21 @@ class ChatConsumer(WebsocketConsumer):
     def receive(self, text_data):
         text_data_json = json.loads(text_data)
         if text_data_json.get("command"):
-            messages = Message.objects.order_by("timestamp").all()[:10]
-            for message in self.messages_to_json(messages):
-                async_to_sync(self.channel_layer.send)(
-                    self.channel_name,
-                    {"type": "chat_message", "message": message["content"]},
-                )
+            try:
+                messages = Message.objects.filter(
+                    room__exact=self.room_group_name
+                ).order_by("timestamp")[:10]
+                for message in self.messages_to_json(messages):
+                    async_to_sync(self.channel_layer.send)(
+                        self.channel_name,
+                        {"type": "chat_message", "message": message["content"]},
+                    )
+            except Message.DoesNotExist:
+                pass
+
         else:
             message = text_data_json["message"]
-            Message.objects.create(content=message)
+            Message.objects.create(room=self.room_group_name, content=message)
 
             # Send message to room group
             async_to_sync(self.channel_layer.group_send)(
