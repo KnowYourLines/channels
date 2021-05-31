@@ -58,7 +58,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
-        if text_data_json.get("command"):
+        if text_data_json.get("command") == "fetch_messages":
             await database_sync_to_async(self.fetch_messages)()
 
         else:
