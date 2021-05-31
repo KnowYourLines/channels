@@ -9,7 +9,8 @@ from api.models import Message
 
 
 def index(request):
-    return render(request, "api/index.html")
+    room_name = uuid.uuid4()
+    return render(request, "api/index.html", {"room_name": room_name})
 
 
 def room(request, room_name):
