@@ -9,6 +9,7 @@ class User(AbstractUser):
 
 class Message(models.Model):
     id = models.AutoField(primary_key=True)
+    username = models.TextField()
     room = models.TextField()
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)

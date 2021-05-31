@@ -13,7 +13,11 @@ class ChatConsumer(WebsocketConsumer):
         return result
 
     def message_to_json(self, message):
-        return {"content": message.content, "timestamp": str(message.timestamp)}
+        return {
+            "username": message.username,
+            "content": message.content,
+            "timestamp": str(message.timestamp),
+        }
 
     def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
@@ -43,18 +47,25 @@ class ChatConsumer(WebsocketConsumer):
                 for message in self.messages_to_json(messages):
                     async_to_sync(self.channel_layer.send)(
                         self.channel_name,
-                        {"type": "chat_message", "message": message["content"]},
+                        {
+                            "type": "chat_message",
+                            "message": f"{message['username']}: {message['content']}",
+                        },
                     )
             except Message.DoesNotExist:
                 pass
 
         else:
             message = text_data_json["message"]
-            Message.objects.create(room=self.room_group_name, content=message)
+            self.username = text_data_json["user"]
+            Message.objects.create(
+                username=self.username, room=self.room_group_name, content=message
+            )
 
             # Send message to room group
             async_to_sync(self.channel_layer.group_send)(
-                self.room_group_name, {"type": "chat_message", "message": message}
+                self.room_group_name,
+                {"type": "chat_message", "message": f"{self.username}: {message}"},
             )
 
     # Receive message from room group
