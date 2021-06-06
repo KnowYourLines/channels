@@ -3,23 +3,15 @@ import uuid
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import render
 
 from api.models import Message
 
 
-def index(request):
-    room_name = uuid.uuid4()
-    return render(request, "api/index.html", {"room_name": room_name})
-
-
-def room(request, room_name):
+def username(request):
     username = uuid.uuid4()
     if request.user.is_authenticated:
         username = request.user.get_username()
-    return render(
-        request, "api/room.html", {"room_name": room_name, "username": username}
-    )
+    return JsonResponse({"username": username})
 
 
 @login_required
