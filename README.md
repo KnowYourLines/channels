@@ -1,7 +1,7 @@
 [Instructions to duplicate this repository](https://docs.github.com/en/github/importing-your-projects-to-github/importing-a-repository-with-github-importer)
 
 # Local development
-Run this API with a local postgres db for data persistence. Then access from `http://localhost:8000` on a web browser. `docker-compose.yml` defines the local environment.
+Run this API with a local postgres db for data persistence. Then access from `http://localhost:8000` on a web browser. `docker-compose.yml` defines the local environment. If you want to access this API from a locally running frontend, you will need to add its URL to `CORS_ALLOWED_ORIGINS`.
 ```
 docker-compose up
 ```
