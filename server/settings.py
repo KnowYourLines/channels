@@ -36,7 +36,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     "corsheaders",
     "channels",
-    "api.apps.ApiConfig",
+    "api",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -44,7 +44,28 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "firebase_auth",
 ]
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "firebase_auth.authentication.FirebaseAuthentication",
+    ),
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "DEBUG",
+    },
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",

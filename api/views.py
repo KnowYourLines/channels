@@ -3,15 +3,20 @@ import uuid
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
 from api.models import Message
 
 
+@api_view(["GET"])
 def username(request):
     username = uuid.uuid4()
     if request.user.is_authenticated:
-        username = request.user.get_username()
-    return JsonResponse({"username": username})
+        username = (
+            request.user.first_name or request.user.email or request.user.username
+        )
+    return Response({"username": username})
 
 
 @login_required
