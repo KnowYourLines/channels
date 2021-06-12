@@ -1,9 +1,13 @@
 import json
+import logging
+
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from api.models import Message
+
+logger = logging.getLogger(__name__)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -11,7 +15,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         result = []
         for message in messages:
             result.append(self.message_to_json(message))
-        return result
+        return result[::-1]
 
     def message_to_json(self, message):
         return {
@@ -37,8 +41,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             messages = Message.objects.filter(
                 room__exact=self.room_group_name
-            ).order_by("timestamp")[:10]
-
+            ).order_by("-timestamp")[:10]
+            logger.debug(f"{self.messages_to_json(messages)}")
             for message in self.messages_to_json(messages):
                 async_to_sync(self.channel_layer.send)(
                     self.channel_name,
