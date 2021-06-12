@@ -52,10 +52,20 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
         except Exception:
             raise FirebaseError()
 
+        name = decoded_token.get("name")
+        last_name = ""
+        first_name = ""
+        if name:
+            split_name = name.split(" ")
+            first_name = split_name[0]
+            if len(split_name) > 1:
+                last_name = split_name[1]
+
         user, created = User.objects.get_or_create(
             username=uid,
-            first_name=decoded_token.get("name"),
-            email=decoded_token.get("email"),
+            first_name=first_name,
+            last_name=last_name,
+            email=decoded_token.get("email") or "",
         )
 
         return (user, None)
