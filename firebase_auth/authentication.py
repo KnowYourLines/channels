@@ -61,12 +61,14 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             if len(split_name) > 1:
                 last_name = split_name[1]
 
-        user, created = User.objects.get_or_create(
+        user, created = User.objects.update_or_create(
             username=uid,
-            first_name=first_name,
-            last_name=last_name,
-            email=decoded_token.get("email") or "",
-            phone_number=decoded_token.get("phone_number") or "",
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": decoded_token.get("email") or "",
+                "phone_number": decoded_token.get("phone_number") or "",
+            },
         )
 
         return (user, None)
