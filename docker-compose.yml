@@ -26,3 +26,9 @@ services:
       - SECRET_KEY=!!f1r=78mf)an7i&t8yqy*#e%*wwcx59am^8(xor#11uh^98kt
       - DEBUG=True
       - LOCAL=True
+      - FIREBASE_PROJECT_ID=
+      - FIREBASE_PRIVATE_KEY_ID=
+      - FIREBASE_PRIVATE_KEY=
+      - FIREBASE_CLIENT_EMAIL=
+      - FIREBASE_CLIENT_ID=
+      - FIREBASE_CLIENT_CERT_URL=
