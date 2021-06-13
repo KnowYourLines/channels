@@ -48,7 +48,7 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
 
         try:
             uid = decoded_token.get("uid")
-            logger.debug(f"{decoded_token}")
+            logger.debug(f"decoded_token: {decoded_token}")
         except Exception:
             raise FirebaseError()
 
@@ -66,6 +66,7 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             first_name=first_name,
             last_name=last_name,
             email=decoded_token.get("email") or "",
+            phone_number=decoded_token.get("phone_number") or "",
         )
 
         return (user, None)
