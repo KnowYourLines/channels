@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.validators import RegexValidator
 from django.db import models
 
@@ -14,9 +16,16 @@ class User(AbstractUser):
     display_name = models.CharField(max_length=150, blank=True)
 
 
+class Room(models.Model):
+    display_name = models.CharField(max_length=150, blank=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    private = models.BooleanField(blank=False, default=False)
+    members = models.ManyToManyField(User)
+
+
 class Message(models.Model):
     id = models.AutoField(primary_key=True)
-    username = models.TextField()
-    room = models.TextField()
+    username = models.ForeignKey(User, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)

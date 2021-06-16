@@ -4,8 +4,10 @@ import logging
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from firebase_admin import auth
 
-from api.models import Message
+from api.models import Message, Room, User
+from firebase_auth.exceptions import FirebaseError, InvalidAuthToken
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def message_to_json(self, message):
         return {
-            "username": message.username,
+            "username": message.username.display_name,
             "content": message.content,
             "timestamp": str(message.timestamp),
         }
@@ -27,9 +29,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = self.room_name
+        self.room = await database_sync_to_async(self.get_or_create_room)(
+            self.room_group_name
+        )
 
         # Join room group
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.channel_layer.group_add(str(self.room.id), self.channel_name)
 
         await self.accept()
 
@@ -39,9 +44,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def fetch_messages(self):
         try:
-            messages = Message.objects.filter(
-                room__exact=self.room_group_name
-            ).order_by("-timestamp")[:10]
+            messages = self.room.message_set.order_by("-timestamp")[:10]
             logger.debug(f"{self.messages_to_json(messages)}")
             for message in self.messages_to_json(messages):
                 async_to_sync(self.channel_layer.send)(
@@ -54,10 +57,46 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Message.DoesNotExist:
             pass
 
-    def create_new_message(self, username, message):
+    def update_room_members(self, room, user):
+        if user not in room.members.all():
+            room.members.add(user)
+
+    def get_or_create_room(self, room_id):
+        room, created = Room.objects.get_or_create(id=room_id)
+        return room
+
+    def create_new_message(self, message, username):
+        self.user.display_name = username
+        self.user.save()
         return Message.objects.create(
-            username=username, room=self.room_group_name, content=message
+            username=self.user, room=self.room, content=message
         )
+
+    def get_user(self, decoded_token):
+        try:
+            uid = decoded_token.get("uid")
+            logger.debug(f"decoded_token: {decoded_token}")
+        except Exception:
+            raise FirebaseError()
+
+        name = decoded_token.get("name")
+        last_name = ""
+        first_name = ""
+        if name:
+            split_name = name.split(" ")
+            first_name = split_name[0]
+            if len(split_name) > 1:
+                last_name = split_name[1]
+        user, created = User.objects.update_or_create(
+            username=uid,
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": decoded_token.get("email") or "",
+                "phone_number": decoded_token.get("phone_number") or "",
+            },
+        )
+        return user
 
     # Receive message from WebSocket
     async def receive(self, text_data):
@@ -68,7 +107,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
         else:
             message = text_data_json["message"]
             username = text_data_json["user"]
-            await database_sync_to_async(self.create_new_message)(username, message)
+            token = text_data_json["token"]
+            try:
+                decoded_token = auth.verify_id_token(token)
+            except Exception:
+                raise InvalidAuthToken("Invalid auth token")
+                pass
+            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+
+            await database_sync_to_async(self.update_room_members)(self.room, self.user)
+
+            await database_sync_to_async(self.create_new_message)(message, username)
 
             # Send message to room group
             await self.channel_layer.group_send(
