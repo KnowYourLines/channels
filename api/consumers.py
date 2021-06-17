@@ -21,7 +21,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def message_to_json(self, message):
         return {
-            "username": message.username.display_name,
+            "username": message.username.display_name
+            or message.username.get_full_name()
+            or message.username.email
+            or message.username.phone_number
+            or message.username.username,
             "content": message.content,
             "timestamp": str(message.timestamp),
         }
@@ -43,6 +47,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def fetch_messages(self):
         try:
             messages = self.room.message_set.order_by("-timestamp")[:10]
+            logger.debug(f"messages: {messages}")
             logger.debug(f"{self.messages_to_json(messages)}")
             for message in self.messages_to_json(messages):
                 async_to_sync(self.channel_layer.send)(
@@ -64,7 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name,
             {
                 "type": "display_name",
-                "new_display_name": f"{self.user.display_name or self.user.get_full_name() or self.user.email or self.user.username}",
+                "new_display_name": f"{self.user.display_name or self.user.get_full_name() or self.user.email or self.user.phone_number or self.user.username}",
             },
         )
 
