@@ -21,11 +21,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def message_to_json(self, message):
         return {
-            "username": message.username.display_name
-            or message.username.get_full_name()
-            or message.username.email
-            or message.username.phone_number
-            or message.username.username,
+            "username": message.user.display_name
+            or message.user.get_full_name()
+            or message.user.email
+            or message.user.phone_number
+            or message.user.username,
             "content": message.content,
             "timestamp": str(message.timestamp),
         }

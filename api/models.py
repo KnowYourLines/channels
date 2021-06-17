@@ -25,7 +25,7 @@ class Room(models.Model):
 
 class Message(models.Model):
     id = models.AutoField(primary_key=True)
-    username = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
