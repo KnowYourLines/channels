@@ -57,6 +57,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Message.DoesNotExist:
             pass
 
+    def update_display_name(self, new_name):
+        self.user.display_name = new_name
+        self.user.save()
+
+    async def fetch_display_name(self):
+        await self.channel_layer.send(
+            self.channel_name,
+            {
+                "type": "display_name",
+                "new_display_name": f"{self.user.display_name or self.user.get_full_name() or self.user.email or self.user.username}",
+            },
+        )
+
     def update_room_members(self, room, user):
         if user not in room.members.all():
             room.members.add(user)
@@ -65,9 +78,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         room, created = Room.objects.get_or_create(id=room_id)
         return room
 
-    def create_new_message(self, message, username):
-        self.user.display_name = username
-        self.user.save()
+    def create_new_message(self, message):
         return Message.objects.create(
             username=self.user, room=self.room, content=message
         )
@@ -103,7 +114,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         text_data_json = json.loads(text_data)
         if text_data_json.get("command") == "fetch_messages":
             await database_sync_to_async(self.fetch_messages)()
-
+        elif text_data_json.get("command") == "fetch_display_name":
+            token = text_data_json["token"]
+            try:
+                decoded_token = auth.verify_id_token(token)
+            except Exception:
+                raise InvalidAuthToken("Invalid auth token")
+                pass
+            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+            await self.fetch_display_name()
+        elif text_data_json.get("command") == "update_display_name":
+            token = text_data_json["token"]
+            try:
+                decoded_token = auth.verify_id_token(token)
+            except Exception:
+                raise InvalidAuthToken("Invalid auth token")
+                pass
+            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+            await database_sync_to_async(self.update_display_name)(
+                text_data_json["name"]
+            )
         else:
             message = text_data_json["message"]
             username = text_data_json["user"]
@@ -117,7 +147,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             await database_sync_to_async(self.update_room_members)(self.room, self.user)
 
-            await database_sync_to_async(self.create_new_message)(message, username)
+            await database_sync_to_async(self.create_new_message)(message)
 
             # Send message to room group
             await self.channel_layer.group_send(
@@ -131,3 +161,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"message": message}))
+
+    async def display_name(self, event):
+        name = event["new_display_name"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"new_display_name": name}))
