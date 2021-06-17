@@ -29,9 +29,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = self.room_name
-        self.room = await database_sync_to_async(self.get_or_create_room)(
-            self.room_group_name
-        )
+        self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
 
         # Join room group
         await self.channel_layer.group_add(str(self.room.id), self.channel_name)
@@ -74,7 +72,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if user not in room.members.all():
             room.members.add(user)
 
-    def get_or_create_room(self, room_id):
+    def get_room(self, room_id):
         room, created = Room.objects.get_or_create(id=room_id)
         return room
 
@@ -83,7 +81,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             username=self.user, room=self.room, content=message
         )
 
-    def get_user(self, decoded_token):
+    def get_user(self, token):
+        try:
+            decoded_token = auth.verify_id_token(token)
+        except Exception:
+            raise InvalidAuthToken("Invalid auth token")
+            pass
         try:
             uid = decoded_token.get("uid")
             logger.debug(f"decoded_token: {decoded_token}")
@@ -115,35 +118,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if text_data_json.get("command") == "fetch_messages":
             await database_sync_to_async(self.fetch_messages)()
         elif text_data_json.get("command") == "fetch_display_name":
-            token = text_data_json["token"]
-            try:
-                decoded_token = auth.verify_id_token(token)
-            except Exception:
-                raise InvalidAuthToken("Invalid auth token")
-                pass
-            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+            self.user = await database_sync_to_async(self.get_user)(
+                text_data_json["token"]
+            )
             await self.fetch_display_name()
         elif text_data_json.get("command") == "update_display_name":
-            token = text_data_json["token"]
-            try:
-                decoded_token = auth.verify_id_token(token)
-            except Exception:
-                raise InvalidAuthToken("Invalid auth token")
-                pass
-            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+            self.user = await database_sync_to_async(self.get_user)(
+                text_data_json["token"]
+            )
             await database_sync_to_async(self.update_display_name)(
                 text_data_json["name"]
             )
         else:
             message = text_data_json["message"]
             username = text_data_json["user"]
-            token = text_data_json["token"]
-            try:
-                decoded_token = auth.verify_id_token(token)
-            except Exception:
-                raise InvalidAuthToken("Invalid auth token")
-                pass
-            self.user = await database_sync_to_async(self.get_user)(decoded_token)
+            self.user = await database_sync_to_async(self.get_user)(
+                text_data_json["token"]
+            )
 
             await database_sync_to_async(self.update_room_members)(self.room, self.user)
 
