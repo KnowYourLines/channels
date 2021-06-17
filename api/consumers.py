@@ -118,28 +118,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if text_data_json.get("command") == "fetch_messages":
             await database_sync_to_async(self.fetch_messages)()
         elif text_data_json.get("command") == "fetch_display_name":
-            self.user = await database_sync_to_async(self.get_user)(
-                text_data_json["token"]
-            )
             await self.fetch_display_name()
         elif text_data_json.get("command") == "update_display_name":
-            self.user = await database_sync_to_async(self.get_user)(
-                text_data_json["token"]
-            )
             await database_sync_to_async(self.update_display_name)(
                 text_data_json["name"]
             )
-        else:
-            message = text_data_json["message"]
-            username = text_data_json["user"]
+        elif text_data_json.get("command") == "join_room":
             self.user = await database_sync_to_async(self.get_user)(
                 text_data_json["token"]
             )
-
             await database_sync_to_async(self.update_room_members)(self.room, self.user)
-
+        else:
+            message = text_data_json["message"]
+            username = text_data_json["user"]
             await database_sync_to_async(self.create_new_message)(message)
-
             # Send message to room group
             await self.channel_layer.group_send(
                 self.room_group_name,
