@@ -82,9 +82,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return room
 
     def create_new_message(self, message):
-        return Message.objects.create(
-            username=self.user, room=self.room, content=message
-        )
+        return Message.objects.create(user=self.user, room=self.room, content=message)
 
     def get_user(self, token):
         try:
