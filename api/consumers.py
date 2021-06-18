@@ -131,6 +131,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 text_data_json["token"]
             )
             await database_sync_to_async(self.update_room_members)(self.room, self.user)
+        elif text_data_json.get("command") == "refresh_chat":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_chat"},
+            )
         else:
             message = text_data_json["message"]
             display_name = text_data_json["user"]
@@ -152,3 +157,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         name = event["new_display_name"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"new_display_name": name}))
+
+    async def refresh_chat(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_chat": True}))
