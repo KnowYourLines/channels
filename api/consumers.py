@@ -21,7 +21,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def message_to_json(self, message):
         return {
-            "username": message.user.display_name
+            "display_name": message.user.display_name
             or message.user.get_full_name()
             or message.user.email
             or message.user.phone_number
@@ -54,7 +54,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "chat_message",
-                        "message": f"{message['username']}: {message['content']}",
+                        "message": f"{message['display_name']}: {message['content']}",
                     },
                 )
         except Message.DoesNotExist:
@@ -133,12 +133,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(self.update_room_members)(self.room, self.user)
         else:
             message = text_data_json["message"]
-            username = text_data_json["user"]
+            display_name = text_data_json["user"]
             await database_sync_to_async(self.create_new_message)(message)
             # Send message to room group
             await self.channel_layer.group_send(
                 self.room_group_name,
-                {"type": "chat_message", "message": f"{username}: {message}"},
+                {"type": "chat_message", "message": f"{display_name}: {message}"},
             )
 
     # Receive message from room group
