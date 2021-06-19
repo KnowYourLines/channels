@@ -31,8 +31,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
 
     async def connect(self):
-        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = self.room_name
+        self.room_group_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
 
         # Join room group
@@ -64,12 +63,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.user.display_name = new_name
         self.user.save()
 
+    def update_room_name(self, new_name):
+        self.room.display_name = new_name
+        self.room.save()
+
     async def fetch_display_name(self):
         await self.channel_layer.send(
             self.channel_name,
             {
                 "type": "display_name",
                 "new_display_name": f"{self.user.display_name or self.user.get_full_name() or self.user.email or self.user.phone_number or self.user.username}",
+            },
+        )
+
+    async def fetch_room_name(self):
+        self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
+        logger.debug(f"{self.room.id}: {self.room.display_name}")
+        await self.channel_layer.send(
+            self.channel_name,
+            {
+                "type": "room_name",
+                "new_room_name": f"{self.room.display_name or self.room.id}",
             },
         )
 
@@ -126,6 +140,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(self.update_display_name)(
                 text_data_json["name"]
             )
+        elif text_data_json.get("command") == "fetch_room_name":
+            await self.fetch_room_name()
+        elif text_data_json.get("command") == "update_room_name":
+            await database_sync_to_async(self.update_room_name)(text_data_json["name"])
+        elif text_data_json.get("command") == "refresh_room_name":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_room_name"},
+            )
         elif text_data_json.get("command") == "join_room":
             self.user = await database_sync_to_async(self.get_user)(
                 text_data_json["token"]
@@ -158,6 +181,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"new_display_name": name}))
 
+    async def room_name(self, event):
+        name = event["new_room_name"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"new_room_name": name}))
+
     async def refresh_chat(self, event):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"refresh_chat": True}))
+
+    async def refresh_room_name(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_room_name": True}))
