@@ -144,11 +144,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         return user
 
+    def user_not_allowed(self):
+        return self.user not in self.room.members.all() and self.room.private
+
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         if text_data_json.get("command") == "fetch_messages":
-            await database_sync_to_async(self.fetch_messages)()
+            self.user = await database_sync_to_async(self.get_user)(
+                text_data_json["token"]
+            )
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if user_not_allowed:
+                await self.close()
+            else:
+                await database_sync_to_async(self.fetch_messages)()
         elif text_data_json.get("command") == "fetch_display_name":
             await self.fetch_display_name()
         elif text_data_json.get("command") == "update_display_name":
