@@ -67,6 +67,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room.display_name = new_name
         self.room.save()
 
+    def update_privacy(self, private):
+        self.room.private = private
+        self.room.save()
+
     async def fetch_display_name(self):
         await self.channel_layer.send(
             self.channel_name,
@@ -84,6 +88,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 "type": "room_name",
                 "new_room_name": f"{self.room.display_name or self.room.id}",
+            },
+        )
+
+    async def fetch_privacy(self):
+        self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
+        logger.debug(f"{self.room.id}: {self.room.private}")
+        await self.channel_layer.send(
+            self.channel_name,
+            {
+                "type": "privacy",
+                "privacy": f"{self.room.private}",
             },
         )
 
@@ -149,6 +164,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_room_name"},
             )
+        elif text_data_json.get("command") == "fetch_privacy":
+            await self.fetch_privacy()
+        elif text_data_json.get("command") == "update_privacy":
+            await database_sync_to_async(self.update_privacy)(text_data_json["privacy"])
+        elif text_data_json.get("command") == "refresh_privacy":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_privacy"},
+            )
         elif text_data_json.get("command") == "join_room":
             self.user = await database_sync_to_async(self.get_user)(
                 text_data_json["token"]
@@ -185,6 +209,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         name = event["new_room_name"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"new_room_name": name}))
+
+    async def privacy(self, event):
+        privacy = event["privacy"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"privacy": privacy}))
+
+    async def refresh_privacy(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_privacy": True}))
 
     async def refresh_chat(self, event):
         # Send message to WebSocket
