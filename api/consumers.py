@@ -117,8 +117,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             decoded_token = auth.verify_id_token(token)
         except Exception:
+            logger.debug(f"invalid token: {token}")
             raise InvalidAuthToken("Invalid auth token")
-            pass
         try:
             uid = decoded_token.get("uid")
             logger.debug(f"decoded_token: {decoded_token}")
