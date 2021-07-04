@@ -8,7 +8,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from firebase_admin import auth, credentials
 
-from api.models import Message, Room, User
+from api.models import Message, Room, User, JoinRequest
 from firebase_auth.exceptions import FirebaseError, InvalidAuthToken
 
 logger = logging.getLogger(__name__)
@@ -131,6 +131,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def create_new_message(self, message):
         return Message.objects.create(user=self.user, room=self.room, content=message)
 
+    def get_or_create_new_join_request(self):
+        return JoinRequest.objects.get_or_create(asker=self.user, room=self.room)
+
     def get_user(self, token):
         try:
             decoded_token = auth.verify_id_token(token)
@@ -174,6 +177,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
+                await database_sync_to_async(self.get_or_create_new_join_request)()
                 await self.channel_layer.send(
                     self.channel_name,
                     {
@@ -220,6 +224,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
+                await database_sync_to_async(self.get_or_create_new_join_request)()
                 await self.channel_layer.send(
                     self.channel_name,
                     {

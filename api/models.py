@@ -29,3 +29,10 @@ class Message(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
+
+class JoinRequest(models.Model):
+    id = models.AutoField(primary_key=True)
+    asker = models.ForeignKey(User, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
