@@ -156,8 +156,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
-                await self.close()
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "not_allowed",
+                        "not_allowed": True,
+                    },
+                )
             else:
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "allowed",
+                        "allowed": True,
+                    },
+                )
                 await database_sync_to_async(self.fetch_messages)()
         elif text_data_json.get("command") == "fetch_display_name":
             await self.fetch_display_name()
@@ -187,7 +200,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.user = await database_sync_to_async(self.get_user)(
                 text_data_json["token"]
             )
-            await database_sync_to_async(self.update_room_members)(self.room, self.user)
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if user_not_allowed:
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "not_allowed",
+                        "not_allowed": True,
+                    },
+                )
+            else:
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "allowed",
+                        "allowed": True,
+                    },
+                )
+                await database_sync_to_async(self.update_room_members)(
+                    self.room, self.user
+                )
         elif text_data_json.get("command") == "refresh_chat":
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -219,6 +251,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         name = event["new_room_name"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"new_room_name": name}))
+
+    async def not_allowed(self, event):
+        not_allowed = event["not_allowed"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"not_allowed": not_allowed}))
+
+    async def allowed(self, event):
+        allowed = event["allowed"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"allowed": allowed}))
 
     async def privacy(self, event):
         privacy = event["privacy"]
