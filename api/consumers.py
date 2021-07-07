@@ -98,6 +98,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    def get_room_join_requests(self):
+        self.room = self.get_room(self.room_group_name)
+        requests = list(
+            self.room.joinrequest_set.order_by("-timestamp").values(
+                "user", "user__username", "user__display_name"
+            )
+        )
+        return requests
+
+    async def fetch_join_requests(self):
+        try:
+            requests = await database_sync_to_async(self.get_room_join_requests)()
+            logger.debug(f"{requests}")
+            await self.channel_layer.send(
+                self.channel_name,
+                {
+                    "type": "requests",
+                    "requests": json.dumps(requests),
+                },
+            )
+        except JoinRequest.DoesNotExist:
+            pass
+
     async def fetch_room_name(self):
         self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
         logger.debug(f"{self.room.id}: {self.room.display_name}")
@@ -132,7 +155,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return Message.objects.create(user=self.user, room=self.room, content=message)
 
     def get_or_create_new_join_request(self):
-        return JoinRequest.objects.get_or_create(asker=self.user, room=self.room)
+        return JoinRequest.objects.get_or_create(user=self.user, room=self.room)
 
     def get_user(self, token):
         try:
@@ -209,6 +232,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_room_name"},
             )
+        elif text_data_json.get("command") == "fetch_join_requests":
+            await self.fetch_join_requests()
         elif text_data_json.get("command") == "fetch_privacy":
             await self.fetch_privacy()
         elif text_data_json.get("command") == "update_privacy":
@@ -284,6 +309,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         allowed = event["allowed"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"allowed": allowed}))
+
+    async def requests(self, event):
+        requests = event["requests"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"requests": requests}))
 
     async def privacy(self, event):
         privacy = event["privacy"]
