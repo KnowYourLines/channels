@@ -201,6 +201,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
                 await database_sync_to_async(self.get_or_create_new_join_request)()
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_join_requests"},
+                )
                 await self.channel_layer.send(
                     self.channel_name,
                     {
@@ -234,6 +238,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif text_data_json.get("command") == "fetch_join_requests":
             await self.fetch_join_requests()
+        # elif text_data_json.get("command") == "refresh_join_requests":
+        #     await self.channel_layer.group_send(
+        #         self.room_group_name,
+        #         {"type": "refresh_join_requests"},
+        #     )
         elif text_data_json.get("command") == "fetch_privacy":
             await self.fetch_privacy()
         elif text_data_json.get("command") == "update_privacy":
@@ -250,6 +259,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
                 await database_sync_to_async(self.get_or_create_new_join_request)()
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_join_requests"},
+                )
                 await self.channel_layer.send(
                     self.channel_name,
                     {
@@ -323,6 +336,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def refresh_privacy(self, event):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"refresh_privacy": True}))
+
+    async def refresh_join_requests(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_join_requests": True}))
 
     async def refresh_chat(self, event):
         # Send message to WebSocket
