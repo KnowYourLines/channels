@@ -160,7 +160,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def approve_room_member(self, username):
         user = User.objects.get(username=username)
         self.room.members.add(user)
-        self.room.joinrequest_set.filter(user=user).filter(room=self.room).delete()
+        self.room.joinrequest_set.filter(user=user).delete()
+
+    def reject_room_member(self, username):
+        user = User.objects.get(username=username)
+        self.room.joinrequest_set.filter(user=user).delete()
 
     def get_user(self, token):
         try:
@@ -269,6 +273,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif text_data_json.get("command") == "approve_user":
             await database_sync_to_async(self.approve_room_member)(
+                text_data_json["username"]
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_join_requests"},
+            )
+        elif text_data_json.get("command") == "reject_user":
+            await database_sync_to_async(self.reject_room_member)(
                 text_data_json["username"]
             )
             await self.channel_layer.group_send(
