@@ -157,6 +157,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_or_create_new_join_request(self):
         return JoinRequest.objects.get_or_create(user=self.user, room=self.room)
 
+    def approve_room_member(self, username):
+        user = User.objects.get(username=username)
+        self.room.members.add(user)
+        self.room.joinrequest_set.filter(user=user).filter(room=self.room).delete()
+
     def get_user(self, token):
         try:
             decoded_token = auth.verify_id_token(token)
@@ -221,6 +226,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     },
                 )
                 await database_sync_to_async(self.fetch_messages)()
+        elif text_data_json.get("command") == "refresh_allowed_status":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_allowed_status"},
+            )
+        elif text_data_json.get("command") == "fetch_allowed_status":
+            self.user = await database_sync_to_async(self.get_user)(
+                text_data_json["token"]
+            )
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if user_not_allowed:
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "not_allowed",
+                        "not_allowed": True,
+                    },
+                )
+            else:
+                await self.channel_layer.send(
+                    self.channel_name,
+                    {
+                        "type": "allowed",
+                        "allowed": True,
+                    },
+                )
         elif text_data_json.get("command") == "fetch_display_name":
             await self.fetch_display_name()
         elif text_data_json.get("command") == "update_display_name":
@@ -236,13 +267,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_room_name"},
             )
+        elif text_data_json.get("command") == "approve_user":
+            await database_sync_to_async(self.approve_room_member)(
+                text_data_json["username"]
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_join_requests"},
+            )
         elif text_data_json.get("command") == "fetch_join_requests":
             await self.fetch_join_requests()
-        # elif text_data_json.get("command") == "refresh_join_requests":
-        #     await self.channel_layer.group_send(
-        #         self.room_group_name,
-        #         {"type": "refresh_join_requests"},
-        #     )
+        elif text_data_json.get("command") == "refresh_join_requests":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_join_requests"},
+            )
         elif text_data_json.get("command") == "fetch_privacy":
             await self.fetch_privacy()
         elif text_data_json.get("command") == "update_privacy":
@@ -348,3 +387,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def refresh_room_name(self, event):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"refresh_room_name": True}))
+
+    async def refresh_allowed_status(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_allowed_status": True}))
