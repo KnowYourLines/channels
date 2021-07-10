@@ -8,7 +8,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from firebase_admin import auth, credentials
 
-from api.models import Message, Room, User, JoinRequest
+from api.models import Message, Room, User, JoinRequest, Notification
 from firebase_auth.exceptions import FirebaseError, InvalidAuthToken
 
 logger = logging.getLogger(__name__)
@@ -151,8 +151,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         room, created = Room.objects.get_or_create(id=room_id)
         return room
 
+    def create_new_message_notification_for_all_room_members(self, new_message):
+        for user in self.room.members.all():
+            Notification.objects.create(user=user, room=self.room, message=new_message)
+
+    def get_rooms_of_all_members(self):
+        rooms = set()
+        for user in self.room.members.all():
+            for room in user.room_set.all():
+                rooms.add(str(room.id))
+        return rooms
+
     def create_new_message(self, message):
-        return Message.objects.create(user=self.user, room=self.room, content=message)
+        new_message = Message.objects.create(
+            user=self.user, room=self.room, content=message
+        )
+        self.create_new_message_notification_for_all_room_members(new_message)
+        return new_message
 
     def get_or_create_new_join_request(self):
         return JoinRequest.objects.get_or_create(user=self.user, room=self.room)
@@ -352,6 +367,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = text_data_json["message"]
             display_name = text_data_json["user"]
             await database_sync_to_async(self.create_new_message)(message)
+            rooms_to_notify = await database_sync_to_async(
+                self.get_rooms_of_all_members
+            )()
+            for room in rooms_to_notify:
+                await self.channel_layer.group_send(
+                    room,
+                    {"type": "refresh_notifications", "refresh_notifications": True},
+                )
             # Send message to room group
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -398,6 +421,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def refresh_privacy(self, event):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"refresh_privacy": True}))
+
+    async def refresh_notifications(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_notifications": True}))
 
     async def refresh_join_requests(self, event):
         # Send message to WebSocket
