@@ -122,6 +122,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             pass
 
     def get_user_notifications(self):
+        self.user.notification_set.filter(room=self.room).update(read=True)
         notifications = list(
             self.user.notification_set.all()
             .values(
