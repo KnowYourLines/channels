@@ -135,7 +135,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         most_recent_room_notifications = []
         rooms_covered_already = set()
-        rooms_covered_already.add(str(self.room.id))
         for notification in notifications:
             notification["room"] = str(notification["room"])
             notification["timestamp"] = str(notification["timestamp"])
