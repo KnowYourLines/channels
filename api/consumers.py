@@ -121,6 +121,43 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except JoinRequest.DoesNotExist:
             pass
 
+    def get_user_notifications(self):
+        notifications = list(
+            self.user.notification_set.all()
+            .values(
+                "room",
+                "message__content",
+                "timestamp",
+                "read",
+            )
+            .order_by("-timestamp", "read")
+        )
+        most_recent_room_notifications = []
+        rooms_covered_already = set()
+        rooms_covered_already.add(str(self.room.id))
+        for notification in notifications:
+            notification["room"] = str(notification["room"])
+            notification["timestamp"] = str(notification["timestamp"])
+            if notification["room"] not in rooms_covered_already:
+                most_recent_room_notifications.append(notification)
+                rooms_covered_already.add(notification["room"])
+
+        return most_recent_room_notifications
+
+    async def fetch_user_notifications(self):
+        try:
+            notifications = await database_sync_to_async(self.get_user_notifications)()
+            logger.debug(f"{notifications}")
+            await self.channel_layer.send(
+                self.channel_name,
+                {
+                    "type": "notifications",
+                    "notifications": json.dumps(notifications),
+                },
+            )
+        except Notification.DoesNotExist:
+            pass
+
     async def fetch_room_name(self):
         self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
         logger.debug(f"{self.room.id}: {self.room.display_name}")
@@ -315,6 +352,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif text_data_json.get("command") == "fetch_join_requests":
             await self.fetch_join_requests()
+        elif text_data_json.get("command") == "fetch_user_notifications":
+            await self.fetch_user_notifications()
         elif text_data_json.get("command") == "refresh_join_requests":
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -412,6 +451,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         requests = event["requests"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"requests": requests}))
+
+    async def notifications(self, event):
+        notifications = event["notifications"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"notifications": notifications}))
 
     async def privacy(self, event):
         privacy = event["privacy"]
