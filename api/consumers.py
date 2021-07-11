@@ -133,7 +133,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "timestamp",
                 "read",
             )
-            .order_by("-timestamp", "read")
+            .order_by("read", "-timestamp")
         )
         most_recent_room_notifications = []
         rooms_covered_already = set()
