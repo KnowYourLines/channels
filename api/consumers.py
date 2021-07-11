@@ -127,6 +127,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.user.notification_set.all()
             .values(
                 "room",
+                "room__display_name",
                 "message__content",
                 "message__user__display_name",
                 "timestamp",
@@ -161,12 +162,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def fetch_room_name(self):
         self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
-        logger.debug(f"{self.room.id}: {self.room.display_name}")
+        if not self.room.display_name:
+            await database_sync_to_async(self.update_room_name)(str(self.room.id))
         await self.channel_layer.send(
             self.channel_name,
             {
                 "type": "room_name",
-                "new_room_name": f"{self.room.display_name or self.room.id}",
+                "new_room_name": f"{self.room.display_name}",
             },
         )
 
@@ -324,6 +326,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.fetch_room_name()
         elif text_data_json.get("command") == "update_room_name":
             await database_sync_to_async(self.update_room_name)(text_data_json["name"])
+            rooms_to_notify = await database_sync_to_async(
+                self.get_rooms_of_all_members
+            )()
+            for room in rooms_to_notify:
+                await self.channel_layer.group_send(
+                    room,
+                    {"type": "refresh_notifications", "refresh_notifications": True},
+                )
         elif text_data_json.get("command") == "refresh_room_name":
             await self.channel_layer.group_send(
                 self.room_group_name,
