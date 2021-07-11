@@ -128,6 +128,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             .values(
                 "room",
                 "message__content",
+                "message__user__display_name",
                 "timestamp",
                 "read",
             )
