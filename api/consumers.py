@@ -186,6 +186,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def update_room_members(self, room, user):
         if user not in room.members.all():
             room.members.add(user)
+            self.create_blank_notification_for_all_room_members()
 
     def get_room(self, room_id):
         room, created = Room.objects.get_or_create(id=room_id)
@@ -194,6 +195,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def create_new_message_notification_for_all_room_members(self, new_message):
         for user in self.room.members.all():
             Notification.objects.create(user=user, room=self.room, message=new_message)
+
+    def create_blank_notification_for_all_room_members(self):
+        for user in self.room.members.all():
+            Notification.objects.create(user=user, room=self.room)
 
     def get_rooms_of_all_members(self):
         rooms = set()
@@ -408,6 +413,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await database_sync_to_async(self.update_room_members)(
                     self.room, self.user
                 )
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {
+                            "type": "refresh_notifications",
+                            "refresh_notifications": True,
+                        },
+                    )
         elif text_data_json.get("command") == "refresh_chat":
             await self.channel_layer.group_send(
                 self.room_group_name,
