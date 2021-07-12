@@ -38,6 +38,9 @@ class Notification(models.Model):
     message = models.ForeignKey(Message, on_delete=models.CASCADE, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(blank=False, default=False)
+    user_joined = models.ForeignKey(
+        User, related_name="joined_user", on_delete=models.CASCADE, null=True
+    )
 
 
 class JoinRequest(models.Model):

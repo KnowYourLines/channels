@@ -132,6 +132,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "message__user__display_name",
                 "timestamp",
                 "read",
+                "user_joined__display_name",
             )
             .order_by("read", "-timestamp")
         )
@@ -186,7 +187,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def update_room_members(self, room, user):
         if user not in room.members.all():
             room.members.add(user)
-            self.create_blank_notification_for_all_room_members()
+            self.create_user_joined_notification_for_all_room_members()
 
     def get_room(self, room_id):
         room, created = Room.objects.get_or_create(id=room_id)
@@ -196,9 +197,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for user in self.room.members.all():
             Notification.objects.create(user=user, room=self.room, message=new_message)
 
-    def create_blank_notification_for_all_room_members(self):
+    def create_user_joined_notification_for_all_room_members(self):
+        if not self.user.display_name:
+            self.update_display_name(
+                self.user.get_full_name()
+                or self.user.email
+                or self.user.phone_number
+                or self.user.username
+            )
         for user in self.room.members.all():
-            Notification.objects.create(user=user, room=self.room)
+            Notification.objects.create(
+                user=user, room=self.room, user_joined=self.user
+            )
 
     def get_rooms_of_all_members(self):
         rooms = set()
