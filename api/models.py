@@ -1,8 +1,9 @@
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
-
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
 
 
@@ -41,6 +42,17 @@ class Notification(models.Model):
     user_joined = models.ForeignKey(
         User, related_name="joined_user", on_delete=models.CASCADE, null=True
     )
+    user_left = models.ForeignKey(
+        User, related_name="left_user", on_delete=models.CASCADE, null=True
+    )
+
+    def clean(self):
+        if not (self.message or self.user_joined or self.user_left):
+            raise ValidationError(
+                _(
+                    "Notification must be for either a new message, user leaving or user joining."
+                )
+            )
 
 
 class JoinRequest(models.Model):

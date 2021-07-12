@@ -133,6 +133,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "timestamp",
                 "read",
                 "user_joined__display_name",
+                "user_left__display_name",
             )
             .order_by("read", "-timestamp")
         )
@@ -188,6 +189,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if user not in room.members.all():
             room.members.add(user)
             self.create_user_joined_notification_for_all_room_members()
+
+    def leave_room(self, room_id):
+        room_to_leave = Room.objects.get(id=room_id)
+        room_to_leave.members.remove(self.user)
+        for user in room_to_leave.members.all():
+            Notification.objects.create(
+                user=user, room=room_to_leave, user_left=self.user
+            )
+        self.user.notification_set.filter(room=room_to_leave).delete()
 
     def get_room(self, room_id):
         room, created = Room.objects.get_or_create(id=room_id)
@@ -354,6 +364,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_room_name"},
             )
+        elif text_data_json.get("command") == "exit_room":
+            await database_sync_to_async(self.leave_room)(text_data_json["room_id"])
+            rooms_to_notify = await database_sync_to_async(
+                self.get_rooms_of_all_members
+            )()
+            for room in rooms_to_notify:
+                await self.channel_layer.group_send(
+                    room,
+                    {
+                        "type": "refresh_notifications",
+                        "refresh_notifications": True,
+                    },
+                )
         elif text_data_json.get("command") == "approve_user":
             await database_sync_to_async(self.approve_room_member)(
                 text_data_json["username"]
