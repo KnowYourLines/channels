@@ -185,6 +185,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def fetch_room_members(self):
+        members = await database_sync_to_async(self.get_room_members)()
+        await self.channel_layer.send(
+            self.channel_name,
+            {
+                "type": "members",
+                "members": json.dumps(members),
+            },
+        )
+
+    def get_room_members(self):
+        return list(self.room.members.all().values("display_name"))
+
     def update_room_members(self, room, user):
         if user not in room.members.all():
             room.members.add(user)
@@ -349,6 +362,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif text_data_json.get("command") == "fetch_room_name":
             await self.fetch_room_name()
+        elif text_data_json.get("command") == "fetch_members":
+            await self.fetch_room_members()
         elif text_data_json.get("command") == "update_room_name":
             await database_sync_to_async(self.update_room_name)(text_data_json["name"])
             rooms_to_notify = await database_sync_to_async(
@@ -365,10 +380,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {"type": "refresh_room_name"},
             )
         elif text_data_json.get("command") == "exit_room":
-            await database_sync_to_async(self.leave_room)(text_data_json["room_id"])
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
             )()
+            await database_sync_to_async(self.leave_room)(text_data_json["room_id"])
+
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
@@ -376,6 +392,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "type": "refresh_notifications",
                         "refresh_notifications": True,
                     },
+                )
+                await self.channel_layer.group_send(
+                    room,
+                    {"type": "refresh_members"},
                 )
         elif text_data_json.get("command") == "approve_user":
             await database_sync_to_async(self.approve_room_member)(
@@ -385,11 +405,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_join_requests"},
             )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_members"},
+            )
         elif text_data_json.get("command") == "approve_all_users":
             await database_sync_to_async(self.approve_all_room_members)()
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_join_requests"},
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_members"},
             )
         elif text_data_json.get("command") == "reject_user":
             await database_sync_to_async(self.reject_room_member)(
@@ -457,6 +485,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             "refresh_notifications": True,
                         },
                     )
+                    await self.channel_layer.group_send(
+                        room,
+                        {"type": "refresh_members"},
+                    )
         elif text_data_json.get("command") == "refresh_chat":
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -507,6 +539,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"allowed": allowed}))
 
+    async def members(self, event):
+        members = event["members"]
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"members": members}))
+
     async def requests(self, event):
         requests = event["requests"]
         # Send message to WebSocket
@@ -525,6 +562,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def refresh_privacy(self, event):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"refresh_privacy": True}))
+
+    async def refresh_members(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"refresh_members": True}))
 
     async def refresh_notifications(self, event):
         # Send message to WebSocket
