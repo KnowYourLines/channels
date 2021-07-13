@@ -201,7 +201,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def update_room_members(self, room, user):
         if user not in room.members.all():
             room.members.add(user)
-            self.create_user_joined_notification_for_all_room_members()
+            self.create_user_joined_notification_for_all_room_members(user_joining=user)
 
     def leave_room(self, room_id):
         room_to_leave = Room.objects.get(id=room_id)
@@ -220,17 +220,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for user in self.room.members.all():
             Notification.objects.create(user=user, room=self.room, message=new_message)
 
-    def create_user_joined_notification_for_all_room_members(self):
-        if not self.user.display_name:
-            self.update_display_name(
-                self.user.get_full_name()
-                or self.user.email
-                or self.user.phone_number
-                or self.user.username
-            )
+    def create_user_joined_notification_for_all_room_members(self, user_joining):
+        if user_joining is self.user:
+            if not self.user.display_name:
+                self.update_display_name(
+                    self.user.get_full_name()
+                    or self.user.email
+                    or self.user.phone_number
+                    or self.user.username
+                )
         for user in self.room.members.all():
             Notification.objects.create(
-                user=user, room=self.room, user_joined=self.user
+                user=user, room=self.room, user_joined=user_joining
             )
 
     def get_rooms_of_all_members(self):
@@ -254,10 +255,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         user = User.objects.get(username=username)
         self.room.members.add(user)
         self.room.joinrequest_set.filter(user=user).delete()
+        self.create_user_joined_notification_for_all_room_members(user_joining=user)
 
     def approve_all_room_members(self):
         for request in self.room.joinrequest_set.all():
             self.room.members.add(request.user)
+            self.create_user_joined_notification_for_all_room_members(
+                user_joining=request.user
+            )
         self.room.joinrequest_set.all().delete()
 
     def reject_room_member(self, username):
@@ -401,6 +406,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(self.approve_room_member)(
                 text_data_json["username"]
             )
+            rooms_to_notify = await database_sync_to_async(
+                self.get_rooms_of_all_members
+            )()
+            for room in rooms_to_notify:
+                await self.channel_layer.group_send(
+                    room,
+                    {"type": "refresh_notifications", "refresh_notifications": True},
+                )
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_join_requests"},
@@ -411,6 +424,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         elif text_data_json.get("command") == "approve_all_users":
             await database_sync_to_async(self.approve_all_room_members)()
+            rooms_to_notify = await database_sync_to_async(
+                self.get_rooms_of_all_members
+            )()
+            for room in rooms_to_notify:
+                await self.channel_layer.group_send(
+                    room,
+                    {"type": "refresh_notifications", "refresh_notifications": True},
+                )
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_join_requests"},
