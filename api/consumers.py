@@ -321,7 +321,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "not_allowed",
-                        "not_allowed": True,
                     },
                 )
             else:
@@ -329,7 +328,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "allowed",
-                        "allowed": True,
                     },
                 )
                 await database_sync_to_async(self.fetch_messages)()
@@ -343,7 +341,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "not_allowed",
-                        "not_allowed": True,
                     },
                 )
             else:
@@ -351,7 +348,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "allowed",
-                        "allowed": True,
                     },
                 )
         elif text_data_json.get("command") == "fetch_display_name":
@@ -502,7 +498,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "not_allowed",
-                        "not_allowed": True,
                     },
                 )
             else:
@@ -510,7 +505,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.channel_name,
                     {
                         "type": "allowed",
-                        "allowed": True,
                     },
                 )
                 await database_sync_to_async(self.update_room_members)(
@@ -567,16 +561,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"new_room_name": name}))
 
-    async def not_allowed(self, event):
-        not_allowed = event["not_allowed"]
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({"not_allowed": not_allowed}))
-
-    async def allowed(self, event):
-        allowed = event["allowed"]
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({"allowed": allowed}))
-
     async def members(self, event):
         members = event["members"]
         # Send message to WebSocket
@@ -596,6 +580,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         privacy = event["privacy"]
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"privacy": privacy}))
+
+    async def not_allowed(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"not_allowed": True}))
+
+    async def allowed(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"allowed": True}))
 
     async def refresh_privacy(self, event):
         # Send message to WebSocket
