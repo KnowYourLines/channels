@@ -333,11 +333,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     },
                 )
                 await database_sync_to_async(self.fetch_messages)()
-        elif text_data_json.get("command") == "refresh_allowed_status":
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_allowed_status"},
-            )
         elif text_data_json.get("command") == "fetch_allowed_status":
             self.user = await database_sync_to_async(self.get_user)(
                 text_data_json["token"]
@@ -371,7 +366,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
-                    {"type": "refresh_notifications", "refresh_notifications": True},
+                    {"type": "refresh_notifications"},
                 )
                 await self.channel_layer.group_send(
                     room,
@@ -393,9 +388,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
-                    {"type": "refresh_notifications", "refresh_notifications": True},
+                    {"type": "refresh_notifications"},
                 )
-        elif text_data_json.get("command") == "refresh_room_name":
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_room_name"},
@@ -411,7 +405,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     room,
                     {
                         "type": "refresh_notifications",
-                        "refresh_notifications": True,
                     },
                 )
             await self.channel_layer.group_send(
@@ -428,7 +421,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
-                    {"type": "refresh_notifications", "refresh_notifications": True},
+                    {"type": "refresh_notifications"},
                 )
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -437,6 +430,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_members"},
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_allowed_status"},
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_chat"},
             )
         elif text_data_json.get("command") == "approve_all_users":
             await database_sync_to_async(self.approve_all_room_members)()
@@ -446,7 +447,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
-                    {"type": "refresh_notifications", "refresh_notifications": True},
+                    {
+                        "type": "refresh_notifications",
+                    },
                 )
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -455,6 +458,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_members"},
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_allowed_status"},
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {"type": "refresh_chat"},
             )
         elif text_data_json.get("command") == "reject_user":
             await database_sync_to_async(self.reject_room_member)(
@@ -468,16 +479,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.fetch_join_requests()
         elif text_data_json.get("command") == "fetch_user_notifications":
             await self.fetch_user_notifications()
-        elif text_data_json.get("command") == "refresh_join_requests":
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_join_requests"},
-            )
         elif text_data_json.get("command") == "fetch_privacy":
             await self.fetch_privacy()
         elif text_data_json.get("command") == "update_privacy":
             await database_sync_to_async(self.update_privacy)(text_data_json["privacy"])
-        elif text_data_json.get("command") == "refresh_privacy":
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_privacy"},
@@ -519,18 +524,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         room,
                         {
                             "type": "refresh_notifications",
-                            "refresh_notifications": True,
                         },
                     )
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {"type": "refresh_members"},
                 )
-        elif text_data_json.get("command") == "refresh_chat":
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_chat"},
-            )
         else:
             message = text_data_json["message"]
             display_name = text_data_json["user"]
@@ -541,7 +540,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
                     room,
-                    {"type": "refresh_notifications", "refresh_notifications": True},
+                    {
+                        "type": "refresh_notifications",
+                    },
                 )
             # Send message to room group
             await self.channel_layer.group_send(
