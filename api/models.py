@@ -47,7 +47,12 @@ class Notification(models.Model):
     )
 
     def clean(self):
-        if not (self.message or self.user_joined or self.user_left):
+        if (
+            (not (self.message or self.user_joined or self.user_left))
+            or (self.message and (self.user_joined or self.user_left))
+            or (self.user_joined and (self.message or self.user_left))
+            or (self.user_left and (self.message or self.user_joined))
+        ):
             raise ValidationError(
                 _(
                     "Notification must be for either a new message, user leaving or user joining."
