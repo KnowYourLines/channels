@@ -181,7 +181,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name,
             {
                 "type": "privacy",
-                "privacy": f"{self.room.private}",
+                "privacy": self.room.private,
             },
         )
 
@@ -305,10 +305,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from WebSocket
     async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        if text_data_json.get("command") == "fetch_messages":
+        input_payload = json.loads(text_data)
+        if input_payload.get("command") == "fetch_messages":
             self.user = await database_sync_to_async(self.get_user)(
-                text_data_json["token"]
+                input_payload["token"]
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
@@ -331,9 +331,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     },
                 )
                 await database_sync_to_async(self.fetch_messages)()
-        elif text_data_json.get("command") == "fetch_allowed_status":
+        elif input_payload.get("command") == "fetch_allowed_status":
             self.user = await database_sync_to_async(self.get_user)(
-                text_data_json["token"]
+                input_payload["token"]
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
@@ -350,11 +350,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "type": "allowed",
                     },
                 )
-        elif text_data_json.get("command") == "fetch_display_name":
+        elif input_payload.get("command") == "fetch_display_name":
             await self.fetch_display_name()
-        elif text_data_json.get("command") == "update_display_name":
+        elif input_payload.get("command") == "update_display_name":
             await database_sync_to_async(self.update_display_name)(
-                text_data_json["name"]
+                input_payload["name"]
             )
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
@@ -372,12 +372,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     room,
                     {"type": "refresh_chat"},
                 )
-        elif text_data_json.get("command") == "fetch_room_name":
+        elif input_payload.get("command") == "fetch_room_name":
             await self.fetch_room_name()
-        elif text_data_json.get("command") == "fetch_members":
+        elif input_payload.get("command") == "fetch_members":
             await self.fetch_room_members()
-        elif text_data_json.get("command") == "update_room_name":
-            await database_sync_to_async(self.update_room_name)(text_data_json["name"])
+        elif input_payload.get("command") == "update_room_name":
+            await database_sync_to_async(self.update_room_name)(input_payload["name"])
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
             )()
@@ -390,11 +390,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_room_name"},
             )
-        elif text_data_json.get("command") == "exit_room":
+        elif input_payload.get("command") == "exit_room":
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
             )()
-            await database_sync_to_async(self.leave_room)(text_data_json["room_id"])
+            await database_sync_to_async(self.leave_room)(input_payload["room_id"])
 
             for room in rooms_to_notify:
                 await self.channel_layer.group_send(
@@ -404,12 +404,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     },
                 )
             await self.channel_layer.group_send(
-                text_data_json["room_id"],
+                input_payload["room_id"],
                 {"type": "refresh_members"},
             )
-        elif text_data_json.get("command") == "approve_user":
+        elif input_payload.get("command") == "approve_user":
             await database_sync_to_async(self.approve_room_member)(
-                text_data_json["username"]
+                input_payload["username"]
             )
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
@@ -435,7 +435,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_chat"},
             )
-        elif text_data_json.get("command") == "approve_all_users":
+        elif input_payload.get("command") == "approve_all_users":
             await database_sync_to_async(self.approve_all_room_members)()
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
@@ -463,29 +463,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {"type": "refresh_chat"},
             )
-        elif text_data_json.get("command") == "reject_user":
+        elif input_payload.get("command") == "reject_user":
             await database_sync_to_async(self.reject_room_member)(
-                text_data_json["username"]
+                input_payload["username"]
             )
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_join_requests"},
             )
-        elif text_data_json.get("command") == "fetch_join_requests":
+        elif input_payload.get("command") == "fetch_join_requests":
             await self.fetch_join_requests()
-        elif text_data_json.get("command") == "fetch_user_notifications":
+        elif input_payload.get("command") == "fetch_user_notifications":
             await self.fetch_user_notifications()
-        elif text_data_json.get("command") == "fetch_privacy":
+        elif input_payload.get("command") == "fetch_privacy":
             await self.fetch_privacy()
-        elif text_data_json.get("command") == "update_privacy":
-            await database_sync_to_async(self.update_privacy)(text_data_json["privacy"])
+        elif input_payload.get("command") == "update_privacy":
+            await database_sync_to_async(self.update_privacy)(input_payload["privacy"])
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {"type": "refresh_privacy"},
             )
-        elif text_data_json.get("command") == "join_room":
+        elif input_payload.get("command") == "join_room":
             self.user = await database_sync_to_async(self.get_user)(
-                text_data_json["token"]
+                input_payload["token"]
             )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
@@ -525,8 +525,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     {"type": "refresh_members"},
                 )
         else:
-            message = text_data_json["message"]
-            display_name = text_data_json["user"]
+            message = input_payload["message"]
+            display_name = input_payload["user"]
             await database_sync_to_async(self.create_new_message)(message)
             rooms_to_notify = await database_sync_to_async(
                 self.get_rooms_of_all_members
