@@ -32,6 +32,13 @@ class Message(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
 
+class JoinRequest(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+
 class Notification(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -45,23 +52,86 @@ class Notification(models.Model):
     user_left = models.ForeignKey(
         User, related_name="left_user", on_delete=models.CASCADE, null=True
     )
+    join_request = models.ForeignKey(JoinRequest, on_delete=models.CASCADE, null=True)
+    now_private = models.BooleanField(null=True)
+    now_public = models.BooleanField(null=True)
 
     def clean(self):
         if (
-            (not (self.message or self.user_joined or self.user_left))
-            or (self.message and (self.user_joined or self.user_left))
-            or (self.user_joined and (self.message or self.user_left))
-            or (self.user_left and (self.message or self.user_joined))
+            (
+                not (
+                    self.message
+                    or self.user_joined
+                    or self.user_left
+                    or self.user_join_request
+                    or self.now_public
+                    or self.now_private
+                )
+            )
+            or (
+                self.message
+                and (
+                    self.user_joined
+                    or self.user_left
+                    or self.user_join_request
+                    or self.now_public
+                    or self.now_private
+                )
+            )
+            or (
+                self.user_joined
+                and (
+                    self.message
+                    or self.user_left
+                    or self.user_join_request
+                    or self.now_public
+                    or self.now_private
+                )
+            )
+            or (
+                self.user_left
+                and (
+                    self.message
+                    or self.user_joined
+                    or self.user_join_request
+                    or self.now_public
+                    or self.now_private
+                )
+            )
+            or (
+                self.user_join_request
+                and (
+                    self.message
+                    or self.user_joined
+                    or self.user_left
+                    or self.now_public
+                    or self.now_private
+                )
+            )
+            or (
+                self.now_public
+                and (
+                    self.message
+                    or self.user_joined
+                    or self.user_left
+                    or self.user_join_request
+                    or self.now_private
+                )
+            )
+            or (
+                self.now_private
+                and (
+                    self.message
+                    or self.user_joined
+                    or self.user_left
+                    or self.user_join_request
+                    or self.now_public
+                )
+            )
         ):
             raise ValidationError(
                 _(
-                    "Notification must be for either a new message, user leaving or user joining."
+                    "Notification must be for either a new message, user leaving, user joining, join request or "
+                    "privacy change. "
                 )
             )
-
-
-class JoinRequest(models.Model):
-    id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
