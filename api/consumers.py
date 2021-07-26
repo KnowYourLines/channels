@@ -412,126 +412,168 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     {"type": "refresh_chat"},
                 )
         elif input_payload.get("command") == "fetch_room_name":
-            await self.fetch_room_name()
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await self.fetch_room_name()
         elif input_payload.get("command") == "fetch_members":
-            await self.fetch_room_members()
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await self.fetch_room_members()
         elif input_payload.get("command") == "update_room_name":
-            await database_sync_to_async(self.update_room_name)(input_payload["name"])
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            for room in rooms_to_notify:
-                await self.channel_layer.group_send(
-                    room,
-                    {"type": "refresh_notifications"},
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await database_sync_to_async(self.update_room_name)(
+                    input_payload["name"]
                 )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_room_name"},
-            )
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {"type": "refresh_notifications"},
+                    )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_room_name"},
+                )
         elif input_payload.get("command") == "exit_room":
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            await database_sync_to_async(self.leave_room)(input_payload["room_id"])
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                await database_sync_to_async(self.leave_room)(input_payload["room_id"])
 
-            for room in rooms_to_notify:
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {
+                            "type": "refresh_notifications",
+                        },
+                    )
                 await self.channel_layer.group_send(
-                    room,
-                    {
-                        "type": "refresh_notifications",
-                    },
+                    input_payload["room_id"],
+                    {"type": "refresh_members"},
                 )
-            await self.channel_layer.group_send(
-                input_payload["room_id"],
-                {"type": "refresh_members"},
-            )
         elif input_payload.get("command") == "approve_user":
-            await database_sync_to_async(self.approve_room_member)(
-                input_payload["username"]
-            )
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            for room in rooms_to_notify:
-                await self.channel_layer.group_send(
-                    room,
-                    {"type": "refresh_notifications"},
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await database_sync_to_async(self.approve_room_member)(
+                    input_payload["username"]
                 )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_join_requests"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_members"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_allowed_status"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_chat"},
-            )
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {"type": "refresh_notifications"},
+                    )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_join_requests"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_members"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_allowed_status"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_chat"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_room_name"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_privacy"},
+                )
         elif input_payload.get("command") == "approve_all_users":
-            await database_sync_to_async(self.approve_all_room_members)()
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            for room in rooms_to_notify:
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await database_sync_to_async(self.approve_all_room_members)()
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {
+                            "type": "refresh_notifications",
+                        },
+                    )
                 await self.channel_layer.group_send(
-                    room,
-                    {
-                        "type": "refresh_notifications",
-                    },
+                    self.room_group_name,
+                    {"type": "refresh_join_requests"},
                 )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_join_requests"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_members"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_allowed_status"},
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_chat"},
-            )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_members"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_allowed_status"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_chat"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_room_name"},
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_privacy"},
+                )
         elif input_payload.get("command") == "reject_user":
-            await database_sync_to_async(self.reject_room_member)(
-                input_payload["username"]
-            )
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_join_requests"},
-            )
-        elif input_payload.get("command") == "fetch_join_requests":
-            await self.fetch_join_requests()
-        elif input_payload.get("command") == "fetch_user_notifications":
-            await self.fetch_user_notifications()
-        elif input_payload.get("command") == "fetch_privacy":
-            await self.fetch_privacy()
-        elif input_payload.get("command") == "update_privacy":
-            await database_sync_to_async(self.update_privacy)(input_payload["privacy"])
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "refresh_privacy"},
-            )
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            for room in rooms_to_notify:
-                await self.channel_layer.group_send(
-                    room,
-                    {
-                        "type": "refresh_notifications",
-                    },
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await database_sync_to_async(self.reject_room_member)(
+                    input_payload["username"]
                 )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_join_requests"},
+                )
+        elif input_payload.get("command") == "fetch_join_requests":
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await self.fetch_join_requests()
+        elif input_payload.get("command") == "fetch_user_notifications":
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await self.fetch_user_notifications()
+        elif input_payload.get("command") == "fetch_privacy":
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await self.fetch_privacy()
+        elif input_payload.get("command") == "update_privacy":
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                await database_sync_to_async(self.update_privacy)(
+                    input_payload["privacy"]
+                )
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {"type": "refresh_privacy"},
+                )
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {
+                            "type": "refresh_notifications",
+                        },
+                    )
         elif input_payload.get("command") == "join_room":
             self.user = await database_sync_to_async(self.get_user)(
                 input_payload["token"]
@@ -587,24 +629,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     {"type": "refresh_members"},
                 )
         else:
-            message = input_payload["message"]
-            display_name = input_payload["user"]
-            await database_sync_to_async(self.create_new_message)(message)
-            rooms_to_notify = await database_sync_to_async(
-                self.get_rooms_of_all_members
-            )()
-            for room in rooms_to_notify:
+            user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
+            if not user_not_allowed:
+                message = input_payload["message"]
+                display_name = input_payload["user"]
+                await database_sync_to_async(self.create_new_message)(message)
+                rooms_to_notify = await database_sync_to_async(
+                    self.get_rooms_of_all_members
+                )()
+                for room in rooms_to_notify:
+                    await self.channel_layer.group_send(
+                        room,
+                        {
+                            "type": "refresh_notifications",
+                        },
+                    )
+                # Send message to room group
                 await self.channel_layer.group_send(
-                    room,
-                    {
-                        "type": "refresh_notifications",
-                    },
+                    self.room_group_name,
+                    {"type": "chat_message", "message": f"{display_name}: {message}"},
                 )
-            # Send message to room group
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {"type": "chat_message", "message": f"{display_name}: {message}"},
-            )
 
     # Receive message from room group
     async def chat_message(self, event):
