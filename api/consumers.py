@@ -4,10 +4,8 @@ import logging
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from firebase_admin import auth
 
 from api.models import Message, Room, User, JoinRequest, Notification
-from firebase_auth.exceptions import FirebaseError, InvalidAuthToken
 
 logger = logging.getLogger(__name__)
 
@@ -278,37 +276,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         user = User.objects.get(username=username)
         self.room.joinrequest_set.filter(user=user).delete()
 
-    def get_user(self, token):
-        try:
-            decoded_token = auth.verify_id_token(token)
-        except Exception:
-            logger.debug(f"invalid token: {token}")
-            raise InvalidAuthToken("Invalid auth token")
-        try:
-            uid = decoded_token.get("uid")
-            logger.debug(f"decoded_token: {decoded_token}")
-        except Exception:
-            raise FirebaseError()
-
-        name = decoded_token.get("name")
-        last_name = ""
-        first_name = ""
-        if name:
-            split_name = name.split(" ")
-            first_name = split_name[0]
-            if len(split_name) > 1:
-                last_name = split_name[1]
-        user, created = User.objects.update_or_create(
-            username=uid,
-            defaults={
-                "first_name": first_name,
-                "last_name": last_name,
-                "email": decoded_token.get("email") or "",
-                "phone_number": decoded_token.get("phone_number") or "",
-            },
-        )
-        return user
-
     def user_not_allowed(self):
         return self.user not in self.room.members.all() and self.room.private
 
@@ -316,9 +283,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         input_payload = json.loads(text_data)
         if input_payload.get("command") == "fetch_messages":
-            self.user = await database_sync_to_async(self.get_user)(
-                input_payload["token"]
-            )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
                 created = await database_sync_to_async(
@@ -354,9 +318,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
                 await database_sync_to_async(self.fetch_messages)()
         elif input_payload.get("command") == "fetch_allowed_status":
-            self.user = await database_sync_to_async(self.get_user)(
-                input_payload["token"]
-            )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
                 await self.channel_layer.send(
@@ -558,9 +519,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         },
                     )
         elif input_payload.get("command") == "join_room":
-            self.user = await database_sync_to_async(self.get_user)(
-                input_payload["token"]
-            )
             user_not_allowed = await database_sync_to_async(self.user_not_allowed)()
             if user_not_allowed:
                 created = await database_sync_to_async(
