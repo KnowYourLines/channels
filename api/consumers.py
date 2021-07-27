@@ -1,33 +1,15 @@
 import json
 import logging
-import os
 
-import firebase_admin
 from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from firebase_admin import auth, credentials
+from firebase_admin import auth
 
 from api.models import Message, Room, User, JoinRequest, Notification
 from firebase_auth.exceptions import FirebaseError, InvalidAuthToken
 
 logger = logging.getLogger(__name__)
-cred = credentials.Certificate(
-    {
-        "type": "service_account",
-        "project_id": os.environ.get("FIREBASE_PROJECT_ID"),
-        "private_key_id": os.environ.get("FIREBASE_PRIVATE_KEY_ID"),
-        "private_key": os.environ.get("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
-        "client_email": os.environ.get("FIREBASE_CLIENT_EMAIL"),
-        "client_id": os.environ.get("FIREBASE_CLIENT_ID"),
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://accounts.google.com/o/oauth2/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": os.environ.get("FIREBASE_CLIENT_CERT_URL"),
-    }
-)
-
-default_app = firebase_admin.initialize_app(cred)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -51,6 +33,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_group_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room = await database_sync_to_async(self.get_room)(self.room_group_name)
+        self.user = self.scope["user"]
 
         # Join room group
         await self.channel_layer.group_add(str(self.room.id), self.channel_name)
